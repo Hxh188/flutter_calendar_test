@@ -1,6 +1,4 @@
-1.简单的自定义日历控件。
-2.使用方法，例如:
-
+1.简单的自定义日历控件,使用方法，例如:
   void main() => runApp(
     new MaterialApp(
         home: new Scaffold(
@@ -18,4 +16,3 @@
         ),
     )
 );
-
