@@ -1,7 +1,7 @@
 /*
- * author: Created by 李卓原 on 2018/10/18.
- * email: zhuoyuan93@gmail.com
- *  自定义view
+ * author: Created by 黄晓辉 on 2019/07/11.
+ * email: 582087924@qq.com
+ *  简单的自定义日历控件
  */
 
 import 'dart:core';
