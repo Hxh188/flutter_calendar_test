@@ -8,6 +8,9 @@ import 'dart:core';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:my_flutter_test/simple_wheelview.dart';
+
+bool DEBUG = true;
 
 class CalendarWidget extends StatelessWidget
 {
@@ -35,7 +38,28 @@ class CalendarWidget extends StatelessWidget
                         ),
                         new Container(
                             padding: EdgeInsets.fromLTRB(15, 2, 15, 2),
-                            child: new TextWidget(txtKey)
+                            child: FlatButton(onPressed: () => _showSelectMonthDialog(context, (int year, int month){
+                                //获取要跳转的年月在数据列表中的位置索引
+                                int gotoPos = calendarKey?.currentState?.getPosOfYearMonth(year, month);
+                                if(gotoPos >= 0)
+                                    {
+                                        //获取当前页面显示年月
+                                        YearMonth ym = calendarKey?.currentState?.getCurrentShowYearMonth();
+                                        //获取当前页面显示年月的1号在网格中的位置索引
+                                        int startPos = LabelViewPainter.getStartPosOfMonth(ym.year, ym.month);
+                                        //获取当前页面显示年月默认显示几号
+                                        int showDay = ym.initPos - startPos + 1;
+
+                                        //获取要跳转的年月
+                                        YearMonth gotoYm = calendarKey?.currentState?.choices[gotoPos];
+                                        //设置要跳转的年月默认显示几号，跟当前页面显示年月显示几号是一样的。。
+                                        LabelViewPainter.setMonthInitCount(gotoYm, showDay);
+                                        //跳转到要跳转的年月
+                                        calendarKey?.currentState?.setCurrentPos(gotoPos);
+                                    }
+                            }), child:
+                            new TextWidget(txtKey)
+                            )
                         )
                         ,
                         new IconButton(
@@ -78,7 +102,7 @@ class CalendarWidget extends StatelessWidget
     {
         try
         {
-            txtKey?.currentState?.setStr("${calendarKey?.currentState?.getCurrentMonth()}");
+            txtKey?.currentState?.setStr("${calendarKey?.currentState?.getCurrentMonthStr()}");
         }catch(e)
         {
             print(e);
@@ -193,13 +217,34 @@ class CalendarContentState extends State<CalendarContent>  with SingleTickerProv
         }
     }
 
+    void setCurrentPos(int pos)
+    {
+        mPageController.jumpToPage(pos);
+    }
+
+
+
+    int getPosOfYearMonth(int year, int month)
+    {
+        int size = choices.length;
+        for(int i = 0;i < size;i++)
+            {
+                YearMonth ym = choices[i];
+                if(ym.year == year && ym.month == month)
+                    {
+                        return i;
+                    }
+            }
+        return -1;
+    }
+
     ///获取当前页索引
     int getCurrentPos() {
         return mPageController.page.round();
     }
 
     ///获取当前页索引代表的月份
-    String getCurrentMonth() {
+    String getCurrentMonthStr() {
         var data = choices[getCurrentPos()];
         return "${data.year}-${data.month > 9 ? ("${data.month}") : ("0${data
             .month}")}";
@@ -275,48 +320,35 @@ class CalendarContentState extends State<CalendarContent>  with SingleTickerProv
                 return view;
             }
         );
-
-        var nl = NotificationListener<ScrollNotification>(
-            child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                child:
-                Container(
-                    child: pageView,
-                ),
-            ),
-            onNotification: (Notification n)
-            {
-                if(n is ScrollEndNotification){
-//                    tv.
-                }
-//                print(n);
-            },
-        );
-        return nl;
+        return pageView;
     }
 
     ///设置前一个月，后一个月的默认显示的日期
   void setDefaultPosInPreAndNext(int pos, int day) {
       if (pos > 0) {
           var ym = choices[pos - 1];
-          setMonthInitCount(ym, day);
+          LabelViewPainter.setMonthInitCount(ym, day);
       }
 
-      //若不是最后一页，可跳转到下一页
       if (pos < choices.length - 1) {
           var ym = choices[pos + 1];
-          setMonthInitCount(ym, day);
+          LabelViewPainter.setMonthInitCount(ym, day);
       }
   }
 
-  void setMonthInitCount(YearMonth ym, int day)
+  YearMonth getCurrentShowYearMonth()
   {
-      int ymDayCount = LabelViewPainter.getCurMonthDay(ym.year, ym.month);
-      if(day > ymDayCount){
-          day = ymDayCount;
-      }
-      ym.initPos = LabelViewPainter.getStartPosOfMonth( ym.year, ym.month) + day - 1;
+      int pos = getCurrentPos();
+      if(pos >= 0)
+          {
+              return choices[pos];
+          }else
+              {
+                  return null;
+              }
   }
+
+
 
 
 }
@@ -344,7 +376,7 @@ class CalendarItemPageState extends State<CalendarItemPage> {
                         //点击，通知更新视图
                         setState(() {
                             RenderBox renderBox = _globalKey?.currentContext?.findRenderObject();
-                            //获取当前视图的大小
+                            //获取日历视图的大小
                             var viewSize = renderBox.size;
                             //获取日历视图全局坐标
                             var offset =  renderBox.localToGlobal(Offset.zero);
@@ -417,10 +449,7 @@ class LabelViewPainter extends CustomPainter {
 
         for(var i = 0;i < _datas.length;i++)
         {
-            var paint = Paint()
-                ..color = Colors.blue
-                ..isAntiAlias = true
-                ..style = PaintingStyle.stroke;
+
             //获取列号
             var rowPos = i % 7;
             //获取行号, ~/ 相当于整除
@@ -428,6 +457,13 @@ class LabelViewPainter extends CustomPainter {
             var posX = sigleWidth * rowPos + (sigleWidth/2);
             var posY = circleRadius + linePos * circleRadius * 2;
             var txtColor = Colors.black;
+            
+            if(DEBUG)
+                {
+                    var itemBgColor = i % 2 == 0?Colors.green:Colors.yellow;
+                    var rect = Rect.fromLTRB(sigleWidth * rowPos, linePos * circleRadius * 2, sigleWidth * (rowPos + 1), (linePos + 1) * circleRadius * 2);
+                    canvas.drawRect(rect, new Paint()..color = itemBgColor .. style = PaintingStyle.fill);
+                }
 
             switch (_datas[i].monthType)
             {
@@ -442,6 +478,11 @@ class LabelViewPainter extends CustomPainter {
             //显示点击位置的圆圈
             if(i == clickPos)
             {
+                var paint = Paint()
+                    ..color = Colors.blue
+                    ..isAntiAlias = true
+                    ..style = PaintingStyle.stroke;
+
                 paint..style = PaintingStyle.fill;
                 txtColor = Colors.white;
                 canvas.drawCircle(Offset(posX, posY), circleRadius, paint);
@@ -555,7 +596,17 @@ class LabelViewPainter extends CustomPainter {
         return betweenDays;
     }
 
+    static void setMonthInitCount(YearMonth ym, int day)
+    {
+        int ymDayCount = getCurMonthDay(ym.year, ym.month);
+        if(day > ymDayCount){
+            day = ymDayCount;
+        }
+        ym.initPos = getStartPosOfMonth( ym.year, ym.month) + day - 1;
+    }
+
     ///获取点击的坐标所在数据的位置索引
+    ///viewWidth 为日历视图宽度
     static int getClickItemPos(Offset _currentClickCoord, double viewWidth) {
         //单行高度
         double rowHeight = circleRadius * 2;
@@ -603,4 +654,76 @@ class YearMonth
     int year, month;
     int initPos;
     YearMonth(this.year, this.month, this.initPos);
+}
+
+void _showSelectMonthDialog(BuildContext ctx, Function fun)
+{
+    var year = 0;
+    var month = 0;
+    showDialog(context: ctx, builder: (ctx){
+        var currentYear = DateTime.now().year;
+        var listYear = List<String>.generate(61, (int index) => "${currentYear - 30 + index}");
+        var listMonth = List<String>.generate(12, (int index) => "${index + 1}");
+        // 对话框视图默认填充整个屏幕c
+        return Container(
+            alignment: Alignment.bottomCenter,
+            child: Container(//要设置背景色
+                color: Colors.white,
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                        Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: <Widget>[
+                                FlatButton(child: Text(" 取消 ", style: TextStyle(color: Colors.blue)), onPressed: (){Navigator.of(ctx).pop();}),
+                                FlatButton(child: Text(" 确定 ", style: TextStyle(color: Colors.blue)), onPressed: (){
+                                    fun(year, month);
+                                    Navigator.of(ctx).pop();
+
+                                })
+                            ],
+                        ),
+
+                        Container(
+                            width: 360,
+                            height: 250,
+                            child: Row(
+                                mainAxisSize: MainAxisSize.max,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+
+                                children:<Widget>[
+
+                                    Container(
+                                        width: 100,
+                                        child:
+                                        WheelView(0, listYear, (int pos, String str){
+                                            year = num.parse(str);
+                                            print("$pos = $str");
+                                        })
+                                        ,),
+
+                                    Text("年", style: TextStyle(color: Colors.black, fontSize: 15),),
+
+                                    Container(
+                                        width: 100,
+                                        child:
+                                        WheelView(0, listMonth,  (int pos, String str){
+                                            month = num.parse(str);
+                                            print("$pos = $str");
+                                        })
+                                    ),
+
+                                    Text("月", style: TextStyle(color: Colors.black, fontSize: 15)),
+
+                                ]
+                            ),
+                        )
+
+
+
+                    ],),
+            ),
+        );
+    });
 }
