@@ -12,7 +12,7 @@ void main() => runApp(
                 new Scaffold(
                     appBar: AppBar(title: Text("简单日历控件初版"),),
                     body: new Container(
-                        margin: EdgeInsets.fromLTRB(30, 50, 0, 0),
+                        margin: EdgeInsets.fromLTRB(0, 50, 0, 0),
                         child:
                         CalendarWidget(
                             clickFunc: (int year, int month, int day)

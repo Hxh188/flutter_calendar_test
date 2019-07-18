@@ -10,7 +10,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:my_flutter_test/simple_wheelview.dart';
 
-bool DEBUG = true;
+//是否开启调试模式
+bool _DEBUG = true;
 
 class CalendarWidget extends StatelessWidget
 {
@@ -46,15 +47,15 @@ class CalendarWidget extends StatelessWidget
                                         //获取当前页面显示年月
                                         YearMonth ym = calendarKey?.currentState?.getCurrentShowYearMonth();
                                         //获取当前页面显示年月的1号在网格中的位置索引
-                                        int startPos = LabelViewPainter.getStartPosOfMonth(ym.year, ym.month);
+                                        int startPos = CalendarUtil.getStartPosOfMonth(ym.year, ym.month);
                                         //获取当前页面显示年月默认显示几号
                                         int showDay = ym.initPos - startPos + 1;
 
                                         //获取要跳转的年月
                                         YearMonth gotoYm = calendarKey?.currentState?.choices[gotoPos];
                                         //设置要跳转的年月默认显示几号，跟当前页面显示年月显示几号是一样的。。
-                                        LabelViewPainter.setMonthInitCount(gotoYm, showDay);
-                                        //跳转到要跳转的年月
+                                        CalendarUtil.setMonthInitCount(gotoYm, showDay);
+                                        //跳到要跳转的年月
                                         calendarKey?.currentState?.setCurrentPos(gotoPos);
                                     }
                             }), child:
@@ -98,6 +99,7 @@ class CalendarWidget extends StatelessWidget
         );
     }
 
+    ///在中间标题显示当前月份
     void _showCurrentMonth()
     {
         try
@@ -176,17 +178,17 @@ class CalendarContentState extends State<CalendarContent>  with SingleTickerProv
         for (var i = -yearCount; i < 0; i++) {
             int year = currentYear + i;
             for (int j = 1; j <= 12; j++) {
-                choices.add(YearMonth(year, j, -1));
+                choices.add(YearMonth(year, j));
             }
         }
         for (var i = 0; i <= yearCount; i++) {
             int year = currentYear + i;
             for (int j = 1; j <= 12; j++) {
-                var ym = YearMonth(year, j, -1);
+                var ym = YearMonth(year, j);
                 //如果是现在所在的月份，则默认显示今天
                 if(i == 0 && j == now.month){
 
-                    ym.initPos = LabelViewPainter.getStartPosOfMonth(currentYear, j) + now.day - 1;
+                    ym.initPos = CalendarUtil.getStartPosOfMonth(currentYear, j) + now.day - 1;
                 }
                 choices.add(ym);
             }
@@ -274,7 +276,7 @@ class CalendarContentState extends State<CalendarContent>  with SingleTickerProv
 
                 var ym = choices[pos];
 
-                int firstDay = LabelViewPainter.getStartPosOfMonth(
+                int firstDay = CalendarUtil.getStartPosOfMonth(
                     ym.year, ym.month);
                 int day = ym.initPos - firstDay + 1;
                 clickFunc(ym.year, ym.month, day);
@@ -296,7 +298,7 @@ class CalendarContentState extends State<CalendarContent>  with SingleTickerProv
                             if (pos > 0) {
                                 var ym = choices[pos - 1];
                                 ym.initPos =
-                                    LabelViewPainter.getStartPosOfMonth(
+                                    CalendarUtil.getStartPosOfMonth(
                                         ym.year, ym.month) + day - 1;
                                 _nextPage(-1);
                             }
@@ -305,7 +307,7 @@ class CalendarContentState extends State<CalendarContent>  with SingleTickerProv
                             if (pos < choices.length - 1) {
                                 var ym = choices[pos + 1];
                                 ym.initPos =
-                                    LabelViewPainter.getStartPosOfMonth(
+                                    CalendarUtil.getStartPosOfMonth(
                                         ym.year, ym.month) + day - 1;
                                 _nextPage(1);
                             }
@@ -327,15 +329,16 @@ class CalendarContentState extends State<CalendarContent>  with SingleTickerProv
   void setDefaultPosInPreAndNext(int pos, int day) {
       if (pos > 0) {
           var ym = choices[pos - 1];
-          LabelViewPainter.setMonthInitCount(ym, day);
+          CalendarUtil.setMonthInitCount(ym, day);
       }
 
       if (pos < choices.length - 1) {
           var ym = choices[pos + 1];
-          LabelViewPainter.setMonthInitCount(ym, day);
+          CalendarUtil.setMonthInitCount(ym, day);
       }
   }
 
+  ///获取视图当前显示的年月
   YearMonth getCurrentShowYearMonth()
   {
       int pos = getCurrentPos();
@@ -347,9 +350,6 @@ class CalendarContentState extends State<CalendarContent>  with SingleTickerProv
                   return null;
               }
   }
-
-
-
 
 }
 
@@ -370,6 +370,8 @@ class CalendarItemPageState extends State<CalendarItemPage> {
 
     @override
     Widget build(BuildContext context) {
+        //指定月份在网格中对应的数据
+        var dataList = CalendarUtil._initMonthData(ym.year, ym.month);
         return Container(
                 child: GestureDetector(
                     onTapUp: (TapUpDetails details) {
@@ -389,7 +391,7 @@ class CalendarItemPageState extends State<CalendarItemPage> {
                             if(clickPos >= 0)
                             {
                                 ym.initPos = clickPos;
-                                var item = LabelViewPainter._initMonthData(ym.year, ym.month)[clickPos];
+                                var item = dataList[clickPos];
                                 clickFunc(item.year, item.month, item.day, item.monthType);
                             }
 
@@ -397,7 +399,7 @@ class CalendarItemPageState extends State<CalendarItemPage> {
                     },
                     child:
                         CustomPaint(
-                            painter: new LabelViewPainter(this.ym, ym.initPos, clickFunc),
+                            painter: new LabelViewPainter(this.ym, ym.initPos, clickFunc, dataList),
                             child: Center( child: Text(""))
                         )
                     ,
@@ -421,26 +423,11 @@ class LabelViewPainter extends CustomPainter {
 
     YearMonth ym;
 
-    LabelViewPainter(this.ym, int clickPos, Function clickFunc) {
+    LabelViewPainter(this.ym, int clickPos, Function clickFunc, this._datas) {
         this.clickPos = clickPos;
-        _datas = List();
         this.clickFunc = clickFunc;
-
-        int year = ym.year;
-        int month = ym.month;
-        this._datas = _initMonthData(year, month);
     }
 
-    static int getStartPosOfMonth(int year, int month)
-    {
-        int startPos = DateTime(year, month, 1).weekday;
-        //日历视图以星期日开始，故当为sunday，即7时初始位置为0
-        if(startPos == DateTime.sunday)
-        {
-            startPos = 0;
-        }
-        return startPos;
-    }
 
     @override
     void paint(Canvas canvas, Size size) {
@@ -449,7 +436,6 @@ class LabelViewPainter extends CustomPainter {
 
         for(var i = 0;i < _datas.length;i++)
         {
-
             //获取列号
             var rowPos = i % 7;
             //获取行号, ~/ 相当于整除
@@ -458,7 +444,7 @@ class LabelViewPainter extends CustomPainter {
             var posY = circleRadius + linePos * circleRadius * 2;
             var txtColor = Colors.black;
             
-            if(DEBUG)
+            if(_DEBUG)
                 {
                     var itemBgColor = i % 2 == 0?Colors.green:Colors.yellow;
                     var rect = Rect.fromLTRB(sigleWidth * rowPos, linePos * circleRadius * 2, sigleWidth * (rowPos + 1), (linePos + 1) * circleRadius * 2);
@@ -512,7 +498,73 @@ class LabelViewPainter extends CustomPainter {
         return 6 * circleRadius * 2;
     }
 
+    ///获取点击的坐标所在数据的位置索引
+    ///viewWidth 为日历视图宽度
+    static int getClickItemPos(Offset _currentClickCoord, double viewWidth) {
+        //单行高度
+        double rowHeight = circleRadius * 2;
+        if(_currentClickCoord == null)
+        {
+            return -1;
+        }
+        var posX = _currentClickCoord.dx;
+        var posY = _currentClickCoord.dy;
+        //列数向下取整
+        var columnPos = (posX/(viewWidth/7)).floor();
+        //行数向下取整
+        var rowPos = (posY/rowHeight).floor();
 
+        var isInRange = (columnPos >= 0 && columnPos < 7 && rowPos >= 0 && rowPos < 6);
+        if(isInRange)
+        {
+            int pos = rowPos * 7 + columnPos;
+            return pos;
+        }else
+        {
+            return -1;
+        }
+  }
+}
+
+class ItemData
+{
+    int year;
+    int month;
+    int day;
+    MonthType monthType;//-1:上一个月， 0:本月， 1:下一个月
+    ItemData({this.monthType = MonthType.CurrentMonth, this.year, this.month, this.day});
+}
+
+enum MonthType
+{
+    LastMonth,//上一月
+    CurrentMonth,//当月
+    NextMonth//下一月
+}
+
+class YearMonth
+{
+    int year, month;
+    //网格中默认显示的位置
+    int initPos;
+    YearMonth(this.year, this.month, {this.initPos = -1});
+}
+
+class CalendarUtil
+{
+    ///获取某个年月的1号在网格中的位置索引
+    static int getStartPosOfMonth(int year, int month)
+    {
+        int startPos = DateTime(year, month, 1).weekday;
+        //日历视图以星期日开始，故当为sunday，即7时初始位置为0
+        if(startPos == DateTime.sunday)
+        {
+            startPos = 0;
+        }
+        return startPos;
+    }
+
+    ///获取某个年月在网格中对应的数据
     static List<ItemData> _initMonthData(int year, int month)
     {
         List<ItemData> _datas = new List();
@@ -596,6 +648,7 @@ class LabelViewPainter extends CustomPainter {
         return betweenDays;
     }
 
+    ///设置某个年月初始显示几号
     static void setMonthInitCount(YearMonth ym, int day)
     {
         int ymDayCount = getCurMonthDay(ym.year, ym.month);
@@ -605,57 +658,9 @@ class LabelViewPainter extends CustomPainter {
         ym.initPos = getStartPosOfMonth( ym.year, ym.month) + day - 1;
     }
 
-    ///获取点击的坐标所在数据的位置索引
-    ///viewWidth 为日历视图宽度
-    static int getClickItemPos(Offset _currentClickCoord, double viewWidth) {
-        //单行高度
-        double rowHeight = circleRadius * 2;
-        if(_currentClickCoord == null)
-        {
-            return -1;
-        }
-        var posX = _currentClickCoord.dx;
-        var posY = _currentClickCoord.dy;
-        //列数向下取整
-        var columnPos = (posX/(viewWidth/7)).floor();
-        //行数向下取整
-        var rowPos = (posY/rowHeight).floor();
-
-        var isInRange = (columnPos >= 0 && columnPos < 7 && rowPos >= 0 && rowPos < 6);
-        if(isInRange)
-        {
-            int pos = rowPos * 7 + columnPos;
-            return pos;
-        }else
-        {
-            return -1;
-        }
-  }
 }
 
-class ItemData
-{
-    int year;
-    int month;
-    int day;
-    MonthType monthType;//-1:上一个月， 0:本月， 1:下一个月
-    ItemData({this.monthType = MonthType.CurrentMonth, this.year, this.month, this.day});
-}
-
-enum MonthType
-{
-    LastMonth,//上一月
-    CurrentMonth,//当月
-    NextMonth//下一月
-}
-
-class YearMonth
-{
-    int year, month;
-    int initPos;
-    YearMonth(this.year, this.month, this.initPos);
-}
-
+/// 显示月份选择切换对话框
 void _showSelectMonthDialog(BuildContext ctx, Function fun)
 {
     var year = 0;
@@ -685,8 +690,6 @@ void _showSelectMonthDialog(BuildContext ctx, Function fun)
                         ),
 
                         Container(
-                            width: 360,
-                            height: 250,
                             child: Row(
                                 mainAxisSize: MainAxisSize.max,
                                 mainAxisAlignment: MainAxisAlignment.center,
